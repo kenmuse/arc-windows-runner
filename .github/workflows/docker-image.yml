@@ -1,0 +1,44 @@
+name: Docker Image Build
+
+on:
+  push:
+    branches: [ "main" ]
+
+  workflow_dispatch:
+
+permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+
+  build:
+
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Log into registry ${{ env.REGISTRY }}
+      if: github.event_name != 'pull_request'
+      uses: docker/login-action@343f7c4344506bcbf9b4de18042ae17996df046d # v3.0.0
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+   
+      # BuildX is not supported and should not be installed or configured
+      # Features such as multistage builds and cache support are not available
+    - name: Docker build and push
+      run: |
+          $version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
+          echo "Building with runner version v${version}" >> ${env:GITHUB_STEP_SUMMARY}
+          docker build --build-arg RUNNER_VERSION=$version -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${version}" .
+          docker push -a ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+
+

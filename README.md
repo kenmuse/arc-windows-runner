@@ -1,37 +1,9 @@
-Template
+# ARC Windows Runner (Sample)
 
-## Your Project Name
+## About
 
-Describe what does this project does in one line followed by your project logo if you have one. e.g., who might be interested in it, what language its written in, and how it might be different from similar projects.
-
-- Include a list of features and limitations.
-- States the goals and scope of the project to help set expectations and filter proposed changes down the line.
-- Include the current status (e.g., proof of concept, used in production, active development, orphaned, etc.)
-- Include link to demo or production instance
-
-## Background 
-
-It includes a high-level development roadmap or link to open issues/milestones.
-It explicitly asks for contributions, if you want them, with a link to CONTRIBUTING.md.
-
-## Requirements
-
-It includes a description of the kind of environment required to run the software and instructions for setting it up.
-It clearly states the external dependencies and directions for installing them.
-
-Be sure to follow the [GitHub logo guidelines](https://github.com/logos).
-
-## License 
-
-This project is licensed under the terms of the MIT open source license. Please refer to [MIT](./LICENSE) for the full terms.
-
-## Maintainers 
-
-TODO: Enter at least one maintainer in here or point to codeowners file.
+This provides a sample implementation of a containerized Windows-based Actions runner for [GitHub Actions Runner Controller](https://github.com/actions/actions-runner-controller). The build process for the image uses the latest version of the [Actions Runner](https://github.com/actions/runner), assigning a `latest` tag and a tag for the runner version. Runner images should be rebuild daily using a scheduled task to ensure that images are never more than 24 hours behind the current versions. Runners must be updated [at least every 30 days](https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/autoscaling-with-self-hosted-runners#controlling-runner-software-updates-on-self-hosted-runners).
 
 ## Support
 
-TODO: Be explicit about support expectations.
-
-## Acknowledgement
-
+This project is a sample and is not actively supported or maintained (see [SUPPORT](SUPPORT.md)). It is not supported or officially endorsed by GitHub.

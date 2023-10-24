@@ -1,0 +1,13 @@
+Dockerfile
+
+.git
+.gitignore
+
+.devcontainer
+.DS_Store
+
+.github/
+
+*.md
+LICENSE
+CODEOWNERS
