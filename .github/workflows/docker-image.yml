@@ -37,8 +37,10 @@ jobs:
       # Features such as multistage builds and cache support are not available
     - name: Docker Build
       run: |
+          $publishedVersions = $vers=((Invoke-WebRequest -Headers @{ "Authorization"= "Bearer $env:GITHUB_TOKEN" } -Uri https://api.github.com/users/kenmuse/packages/container/arc-windows-runner/versions).Content | ConvertFrom-Json) | %{ [PSCustomObject]@{ Id=$_.id; Url=$_.url;Tags=$_.metadata.container.tags } } | %{ $_.tags } 
           $version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
           echo "Building with runner version v${version}" >> ${env:GITHUB_STEP_SUMMARY}
+          echo "Package exists: $($publishedVersions -Contains "v${version}")" >> ${env:GITHUB_STEP_SUMMARY}
           $hooks_version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner-container-hooks/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
           echo "Building with runner hooks version v${hooks_version}" >> ${env:GITHUB_STEP_SUMMARY}
           docker build --build-arg RUNNER_CONTAINER_HOOKS_VERSION=$hooks_version --build-arg RUNNER_VERSION=$version -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${version}" .
