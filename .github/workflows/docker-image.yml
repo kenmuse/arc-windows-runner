@@ -2,8 +2,9 @@ name: Docker Image Build
 
 on:
   push:
-    branches: [ "main" ]
-
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -34,11 +35,16 @@ jobs:
    
       # BuildX is not supported and should not be installed or configured
       # Features such as multistage builds and cache support are not available
-    - name: Docker build and push
+    - name: Docker Build
       run: |
           $version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
           echo "Building with runner version v${version}" >> ${env:GITHUB_STEP_SUMMARY}
-          docker build --build-arg RUNNER_VERSION=$version -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${version}" .
+          $hooks_version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner-container-hooks/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
+          echo "Building with runner hooks version v${hooks_version}" >> ${env:GITHUB_STEP_SUMMARY}
+          docker build --build-arg RUNNER_CONTAINER_HOOKS_VERSION=$hooks_version --build-arg RUNNER_VERSION=$version -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${version}" .
+    - name: Docker Push
+      if: github.event_name != 'pull_request'
+      run: |
           docker push -a ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
 
