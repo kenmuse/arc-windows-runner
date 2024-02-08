@@ -5,12 +5,14 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  schedule:
+    - cron: '23 0 * * 2,4'
   workflow_dispatch:
 
 permissions:
-      contents: read
-      packages: write
-      id-token: write
+  contents: read
+  packages: write
+  id-token: write
 
 env:
   REGISTRY: ghcr.io
@@ -19,11 +21,10 @@ env:
 jobs:
 
   build:
-
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Log into registry ${{ env.REGISTRY }}
       if: github.event_name != 'pull_request'
@@ -35,15 +36,31 @@ jobs:
    
       # BuildX is not supported and should not be installed or configured
       # Features such as multistage builds and cache support are not available
-    - name: Docker Build
+    - name: Get Versions
+      id: versions
+      env:
+        AUTH: Bearer ${{ github.token }}
       run: |
+          $publishedVersions = $vers=((Invoke-WebRequest -Headers @{ "Authorization"=$env:AUTH } -Uri https://api.github.com/users/kenmuse/packages/container/arc-windows-runner/versions).Content | ConvertFrom-Json) | %{ [PSCustomObject]@{ Id=$_.id; Url=$_.url;Tags=$_.metadata.container.tags } } | %{ $_.tags } 
           $version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
-          echo "Building with runner version v${version}" >> ${env:GITHUB_STEP_SUMMARY}
           $hooks_version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner-container-hooks/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
-          echo "Building with runner hooks version v${hooks_version}" >> ${env:GITHUB_STEP_SUMMARY}
+          echo "PUBLISHED=$($publishedVersions -Contains "v${version}")" >> ${env:GITHUB_OUTPUT}
+          echo "RUNNER_VERSION=${version}"  >> ${env:GITHUB_OUTPUT}
+          echo "RUNNER_HOOKS_VERSION=${hooks_version}" >> ${env:GITHUB_OUTPUT}
+          echo "**Runner version:** v${version}" >> ${env:GITHUB_STEP_SUMMARY}
+          echo "**Runner hooks version:** v${hooks_version}" >> ${env:GITHUB_STEP_SUMMARY}
+          echo "**Published:** $($publishedVersions -Contains "v${version}")" >> ${env:GITHUB_STEP_SUMMARY}
+    - name: Docker Build
+      if: ${{ steps.versions.outputs.PUBLISHED != 'True' }}
+      env:
+        RUNNER_VERSION: ${{ steps.versions.outputs.RUNNER_VERSION }}
+        RUNNER_HOOKS_VERSION: ${{ steps.versions.outputs.RUNNER_HOOKS_VERSION }}
+      run: |
+          $version = $env:RUNNER_VERSION
+          $hooks_version = $env:RUNNER_HOOKS_VERSION
           docker build --build-arg RUNNER_CONTAINER_HOOKS_VERSION=$hooks_version --build-arg RUNNER_VERSION=$version -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${version}" .
     - name: Docker Push
-      if: github.event_name != 'pull_request'
+      if: ${{ github.event_name != 'pull_request' && steps.versions.outputs.PUBLISHED != 'True' }}
       run: |
           docker push -a ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
