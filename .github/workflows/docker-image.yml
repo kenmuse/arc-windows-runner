@@ -46,10 +46,11 @@ jobs:
           $repoOwner = $env:REPO_OWNER 
           $repoName = $env:REPO_NAME
           $orgName = $env:REPO_ORG
+
           # The URL is different for personal or organization endpoints, so resolve the correct one
           # The org variable should be non-empty and match the owner name if this is an organization.
           $packageUrl = ($repoOwner -eq $orgName) ? "https://api.github.com/orgs/$repoOwner/packages/container/$repoName/versions" : "https://api.github.com/users/$repoOwner/packages/container/$repoName/versions"
-          "Using $packageUrl for $repoOwner / $repoName :: $orgName"
+
           $publishedImageVersions = $((Invoke-WebRequest -Headers @{ "Authorization"=$env:AUTH } -Uri $packageUrl).Content | ConvertFrom-Json) | %{ [PSCustomObject]@{ Id=$_.id; Url=$_.url;Tags=$_.metadata.container.tags } } | %{ $_.tags } 
           $currentRunnerVersion = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
           $currentHooksVersion = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner-container-hooks/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
