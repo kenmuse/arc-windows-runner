@@ -17,6 +17,9 @@ permissions:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  REPO_OWNER: ${{ github.event.repository.owner.name }}
+  REPO_NAME: ${{ github.event.repository.name }}
+  REPO_ORG: ${{ github.event.organization.login }}
 
 jobs:
 
@@ -41,24 +44,34 @@ jobs:
       env:
         AUTH: Bearer ${{ github.token }}
       run: |
-          $publishedVersions = $vers=((Invoke-WebRequest -Headers @{ "Authorization"=$env:AUTH } -Uri https://api.github.com/users/kenmuse/packages/container/arc-windows-runner/versions).Content | ConvertFrom-Json) | %{ [PSCustomObject]@{ Id=$_.id; Url=$_.url;Tags=$_.metadata.container.tags } } | %{ $_.tags } 
-          $version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
-          $hooks_version = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner-container-hooks/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
-          echo "PUBLISHED=$($publishedVersions -Contains "v${version}")" >> ${env:GITHUB_OUTPUT}
-          echo "RUNNER_VERSION=${version}"  >> ${env:GITHUB_OUTPUT}
-          echo "RUNNER_HOOKS_VERSION=${hooks_version}" >> ${env:GITHUB_OUTPUT}
-          echo "**Runner version:** v${version}" >> ${env:GITHUB_STEP_SUMMARY}
-          echo "**Runner hooks version:** v${hooks_version}" >> ${env:GITHUB_STEP_SUMMARY}
-          echo "**Published:** $($publishedVersions -Contains "v${version}")" >> ${env:GITHUB_STEP_SUMMARY}
+          $repoOwner = $env:REPO_OWNER 
+          $repoName = $env:REPO_NAME
+          # The URL is different for personal or organization endpoints, so resolve the correct one
+          # The org variable should be non-empty and match the owner name if this is an organization.
+          $packageUrl = ($repoOwner -eq $env:REPO_ORG) ? "https://api.github.com/orgs/$repoOwner/packages/container/$repoName/versions" : "https://api.github.com/users/$repoOwner/packages/container/$repoName/versions"
+          
+          $publishedImageVersions = $((Invoke-WebRequest -Headers @{ "Authorization"=$env:AUTH } -Uri $packageUrl).Content | ConvertFrom-Json) | %{ [PSCustomObject]@{ Id=$_.id; Url=$_.url;Tags=$_.metadata.container.tags } } | %{ $_.tags } 
+          $currentRunnerVersion = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
+          $currentHooksVersion = ((Invoke-WebRequest -Uri https://api.github.com/repos/actions/runner-container-hooks/releases/latest).Content | ConvertFrom-Json).tag_name -replace 'v',''
+
+          # Convert the values to step outputs
+          echo "PUBLISHED=$($publishedImageVersions -Contains "v${currentRunnerVersion}")" >> ${env:GITHUB_OUTPUT}
+          echo "RUNNER_VERSION=${currentRunnerVersion}"  >> ${env:GITHUB_OUTPUT}
+          echo "RUNNER_HOOKS_VERSION=${currentHooksVersion}" >> ${env:GITHUB_OUTPUT}
+
+          # Output details to the step summary
+          echo "**Current Runner version :** v${currentRunnerVersion}" >> ${env:GITHUB_STEP_SUMMARY}
+          echo "**Current Runner hooks version:** v${currentHooksVersion}" >> ${env:GITHUB_STEP_SUMMARY}
+          echo "**Published New Image:** $($publishedImageVersions -Contains "v${currentRunnerVersion}")" >> ${env:GITHUB_STEP_SUMMARY}
     - name: Docker Build
       if: ${{ steps.versions.outputs.PUBLISHED != 'True' }}
       env:
         RUNNER_VERSION: ${{ steps.versions.outputs.RUNNER_VERSION }}
         RUNNER_HOOKS_VERSION: ${{ steps.versions.outputs.RUNNER_HOOKS_VERSION }}
       run: |
-          $version = $env:RUNNER_VERSION
-          $hooks_version = $env:RUNNER_HOOKS_VERSION
-          docker build --build-arg RUNNER_CONTAINER_HOOKS_VERSION=$hooks_version --build-arg RUNNER_VERSION=$version -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${version}" .
+          $currentRunnerVersion = $env:RUNNER_VERSION
+          $currentHooksVersion = $env:RUNNER_HOOKS_VERSION
+          docker build --build-arg RUNNER_CONTAINER_HOOKS_VERSION=$currentHooksVersion --build-arg RUNNER_VERSION=$currentRunnerVersion -f Dockerfile -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:"v${currentRunnerVersion}" .
     - name: Docker Push
       if: ${{ github.event_name != 'pull_request' && steps.versions.outputs.PUBLISHED != 'True' }}
       run: |
