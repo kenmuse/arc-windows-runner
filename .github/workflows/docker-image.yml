@@ -19,8 +19,15 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-
+  tmp:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          CTX: ${{ toJson(github) }}
+        run: |
+          echo $CTX | jq
   build:
+    needs: [tmp]
     runs-on: windows-latest
 
     steps:
